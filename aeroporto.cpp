@@ -83,8 +83,7 @@ void comunicarVoos(int rank, int size, vector<VOO>& v, vector<int>& qtdeVoosPart
         if(orig != rank)
         {
             MPI_Recv(&receb, 1, MPI_INT, orig, 0, MPI_COMM_WORLD,&status);
-            //MPI_Recv(&token, 1, MPI_INT, rank-1, 0, MPI_COMM_WORLD, &status);
-			qtdeVoosChegada[orig] = receb;
+	    qtdeVoosChegada[orig] = receb;
             cout << "Recebendo " << receb << " do processo" << orig << endl;
         }
        
