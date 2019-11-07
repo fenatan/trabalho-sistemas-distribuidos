@@ -33,7 +33,7 @@ int gerarInteirosAleatorio(int n1, int n2){
 }
 
 //Procedimento para gerar os voôs de partida de um aeroporto
-void gerarVoos(int aeroportoID, int totalAeroportos, vector<VOO>& voosPartida){
+void gerarVoos(int aeroportoID, int totalAeroportos, vector<VOO>& voosPartida,  vector<int>& qtdeVoosPartida){
     int numeroTotalDeVoos = gerarInteirosAleatorio(1,10); // Esse valor informa a quantidade total de voos de um aeroporto específico
     
     VOO aux;
@@ -49,6 +49,8 @@ void gerarVoos(int aeroportoID, int totalAeroportos, vector<VOO>& voosPartida){
         aux.horarioEstimadoPartida = gerarInteirosAleatorio(1, 10);
         aux.horarioEstimadoChegada = aux.horarioEstimadoPartida + aux.tempoVoo;
         
+        qtdeVoosPartida[aux.destino]++;
+
         voosPartida.push_back(aux);
     }
     sort(voosPartida.begin(),voosPartida.end(), comp); //ordenação do vetor de partidas
@@ -63,31 +65,26 @@ void imprimirVoos(vector<VOO>& v){
     }
 }
 // Procedimento para comunicar ao processo quantos voos precisa comunicar
-void comunicarVoos(vector<VOO>& v, int size, unsigned int rank){
-    unsigned int i, dest, orig,receb;
+void comunicarVoos(int rank, int size, vector<VOO>& v, vector<int>& qtdeVoosPartida, vector<int>& qtdeVoosChegada){
+    int i, dest, orig,receb;
     MPI_Status status;
-    vector<int> qtdDestino (size,0); 
-    vector<int> qtdChegada (size,0);
-    for(i=0;i < v.size();i++)
+    
+    for(dest=0;dest < size; dest++)
     {
-        dest = v[i].destino;
-        qtdDestino[dest] += 1;
-    }
-    for(dest=0;dest < qtdDestino.size(); dest++)
-    {
-        if(qtdDestino[dest] != 0)
+        if(dest != rank)
         {
-            cout << "enviando " << qtdDestino[dest] << " para o processo " << dest << endl;
-            MPI_Send(&qtdDestino[dest], 1, MPI_INT, dest, rank, MPI_COMM_WORLD);
+            cout << "enviando " << qtdeVoosPartida[dest] << " para o processo " << dest << endl;
+            MPI_Send(&qtdeVoosPartida[dest], 1, MPI_INT, dest, 0, MPI_COMM_WORLD);
         }
        
     }
-    for(orig=0;orig < v.size(); orig++)
+    for(orig=0;orig < size; orig++)
     {
         if(orig != rank)
         {
-            MPI_Recv(&receb, 1, MPI_INT, orig, rank, MPI_COMM_WORLD,&status);
-			qtdChegada[orig] = receb;
+            MPI_Recv(&receb, 1, MPI_INT, orig, 0, MPI_COMM_WORLD,&status);
+            //MPI_Recv(&token, 1, MPI_INT, rank-1, 0, MPI_COMM_WORLD, &status);
+			qtdeVoosChegada[orig] = receb;
             cout << "Recebendo " << receb << " do processo" << orig << endl;
         }
        
@@ -109,11 +106,11 @@ int main(int argc, char* argv[]){
 
     vector<VOO> voosPartida; // Vetor dos voos de partida do aeroporto
     vector<VOO> voosChegada; // Vetor dos voos de chegada do aeroporto
-    //vector<int> qtdeVoosPartida(size+1, 0); //Vetor com a quantidade de voos que partirão desse aeroporto
+    vector<int> qtdeVoosPartida(size, 0); //Vetor com a quantidade de voos que partirão desse aeroporto
     vector<int> qtdeVoosChegada(size, 0); //Vetor com a quantidade de voos que chegarão de cada aeroporto
     
-    gerarVoos(rank, size, voosPartida);
-    comunicarVoos(voosPartida, size, rank);
+    gerarVoos(rank, size, voosPartida, qtdeVoosPartida);
+    comunicarVoos(rank, size, voosPartida, qtdeVoosPartida, qtdeVoosChegada);
     imprimirVoos(voosPartida);
     //cout << gerarInteirosAleatorio(1,100) << endl;
     MPI_Finalize();
