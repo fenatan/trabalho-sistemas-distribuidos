@@ -64,33 +64,56 @@ void imprimirVoos(vector<VOO>& v){
         << "\t\t" << x.tempoVoo << "\t\t" << x.horarioEstimadoPartida << "\t\t" << x.horarioEstimadoChegada <<endl;
     }
 }
-// Procedimento para comunicar ao processo quantos voos precisa comunicar
+
+// Procedimento para avisar a quantidade de voos que serão enviados para cada aeroporto
 void comunicarVoos(int rank, int size, vector<VOO>& v, vector<int>& qtdeVoosPartida, vector<int>& qtdeVoosChegada){
-    int i, dest, orig,receb;
+    int dest, orig, receb;
     MPI_Status status;
     
     for(dest=0;dest < size; dest++)
     {
         if(dest != rank)
         {
-            cout << "enviando " << qtdeVoosPartida[dest] << " para o processo " << dest << endl;
+            cout << "Enviando " << qtdeVoosPartida[dest] << " voos para o aeroporto " << dest << endl;
             MPI_Send(&qtdeVoosPartida[dest], 1, MPI_INT, dest, 0, MPI_COMM_WORLD);
         }
        
     }
+
     for(orig=0;orig < size; orig++)
     {
         if(orig != rank)
         {
             MPI_Recv(&receb, 1, MPI_INT, orig, 0, MPI_COMM_WORLD,&status);
-	    qtdeVoosChegada[orig] = receb;
-            cout << "Recebendo " << receb << " do processo" << orig << endl;
+            //MPI_Recv(&token, 1, MPI_INT, rank-1, 0, MPI_COMM_WORLD, &status);
+			qtdeVoosChegada[orig] = receb;
+            cout << "Recebendo " << receb << " voos do aeroporto " << orig << endl;
         }
        
     }
+}
 
+//procedimento para enviar voos
+void enviarVoos(int rank, int size, vector<VOO>& voosPartida){
+   
+    for(long unsigned int i = 0; i < voosPartida.size(); i++){
+        MPI_Send(&voosPartida[i], sizeof(VOO), MPI_BYTE, voosPartida[i].destino, 0, MPI_COMM_WORLD);
+    }
 
+}
 
+//Procedimento para receber voos
+void receberVoos(int rank, int size, vector<VOO>& voosChegada, vector<int>& qtdeVoosChegada){
+    MPI_Status status;
+
+    VOO aux;
+
+    for(int i = 0; i < size; i++){
+        for(int j = 0; j < qtdeVoosChegada[i]; j++){
+            MPI_Recv(&aux, sizeof(VOO), MPI_BYTE, i, 0, MPI_COMM_WORLD, &status);
+            voosChegada.push_back(aux);
+        }
+    }
 
 }
 
@@ -109,9 +132,13 @@ int main(int argc, char* argv[]){
     vector<int> qtdeVoosChegada(size, 0); //Vetor com a quantidade de voos que chegarão de cada aeroporto
     
     gerarVoos(rank, size, voosPartida, qtdeVoosPartida);
-    comunicarVoos(rank, size, voosPartida, qtdeVoosPartida, qtdeVoosChegada);
     imprimirVoos(voosPartida);
-    //cout << gerarInteirosAleatorio(1,100) << endl;
+    comunicarVoos(rank, size, voosPartida, qtdeVoosPartida, qtdeVoosChegada);
+    enviarVoos(rank, size, voosPartida);
+    receberVoos(rank, size, voosChegada, qtdeVoosChegada);
+    cout << endl << endl;
+    imprimirVoos(voosChegada);
+    
     MPI_Finalize();
     return 0;
 }
