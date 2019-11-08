@@ -8,17 +8,26 @@ typedef struct {
     int origem;
     int destino;
     int tempoVoo;
-    int horarioEstimadoPartida;
-    int horarioRealPartida;
-    int horarioEstimadoChegada;
-    int horarioRealChegada;
+    int horarioPartida;
+    int horarioChegada;
 } VOO;
 
-//Função de comparação para definir qual voo terá prioridade para decolar/pousar
-bool comp(VOO a, VOO b){
-    if(a.horarioEstimadoPartida < b.horarioEstimadoPartida)
+//Função de comparação para definir qual voo terá prioridade para decolar
+bool compPartida(VOO a, VOO b){
+    if(a.horarioPartida < b.horarioPartida)
         return true;
-    if(a.horarioEstimadoPartida > b.horarioEstimadoPartida)
+    if(a.horarioPartida > b.horarioPartida)
+        return false;
+    if(a.tempoVoo > b.tempoVoo)
+        return true;
+    return false;
+}
+
+//Função de comparação para definir qual voo terá prioridade para pousar
+bool compChegada(VOO a, VOO b){
+    if(a.horarioChegada < b.horarioChegada)
+        return true;
+    if(a.horarioChegada > b.horarioChegada)
         return false;
     if(a.tempoVoo > b.tempoVoo)
         return true;
@@ -46,14 +55,22 @@ void gerarVoos(int aeroportoID, int totalAeroportos, vector<VOO>& voosPartida,  
                 break;
         }
         aux.tempoVoo = gerarInteirosAleatorio(1, 10);
-        aux.horarioEstimadoPartida = gerarInteirosAleatorio(1, 10);
-        aux.horarioEstimadoChegada = aux.horarioEstimadoPartida + aux.tempoVoo;
+        aux.horarioPartida = gerarInteirosAleatorio(1, 10);
+        aux.horarioChegada = aux.horarioPartida + aux.tempoVoo;
         
         qtdeVoosPartida[aux.destino]++;
 
         voosPartida.push_back(aux);
     }
-    sort(voosPartida.begin(),voosPartida.end(), comp); //ordenação do vetor de partidas
+    sort(voosPartida.begin(),voosPartida.end(), compPartida); //ordenação do vetor de partidas
+
+    //Tratamento para voos que saem no mesmo horário
+    for(int i = 0; i < numeroTotalDeVoos-1; i++){
+        if(voosPartida[i+1].horarioPartida <= voosPartida[i].horarioPartida){
+            voosPartida[i+1].horarioPartida = voosPartida[i].horarioPartida+1;
+            voosPartida[i+1].horarioChegada = voosPartida[i+1].horarioPartida + voosPartida[i+1].tempoVoo;
+        }
+    }
 }
 
 void imprimirVoos(vector<VOO>& v){
@@ -61,8 +78,9 @@ void imprimirVoos(vector<VOO>& v){
     "Horario_Partida   " << "Horario_Chegada" << endl;
     for(auto x : v){
         cout << x.origem << "\t   " << x.destino 
-        << "\t\t" << x.tempoVoo << "\t\t" << x.horarioEstimadoPartida << "\t\t" << x.horarioEstimadoChegada <<endl;
+        << "\t\t" << x.tempoVoo << "\t\t" << x.horarioPartida << "\t\t" << x.horarioChegada <<endl;
     }
+    cout << "--------------------------------------------------------------------------" << endl;
 }
 
 // Procedimento para avisar a quantidade de voos que serão enviados para cada aeroporto
@@ -79,18 +97,18 @@ void comunicarVoos(int rank, int size, vector<VOO>& v, vector<int>& qtdeVoosPart
         }
        
     }
-
+    cout << endl;
     for(orig=0;orig < size; orig++)
     {
         if(orig != rank)
         {
             MPI_Recv(&receb, 1, MPI_INT, orig, 0, MPI_COMM_WORLD,&status);
-            //MPI_Recv(&token, 1, MPI_INT, rank-1, 0, MPI_COMM_WORLD, &status);
 			qtdeVoosChegada[orig] = receb;
             cout << "Recebendo " << receb << " voos do aeroporto " << orig << endl;
         }
        
     }
+    cout << "--------------------------------------------------------------------------" << endl;
 }
 
 //procedimento para enviar voos
@@ -115,6 +133,14 @@ void receberVoos(int rank, int size, vector<VOO>& voosChegada, vector<int>& qtde
         }
     }
 
+    sort(voosChegada.begin(), voosChegada.end(), compChegada);
+
+    //Tratamento para voos que chegam no mesmo horário
+    for(long unsigned int i = 0; i < voosChegada.size()-1; i++){
+        if(voosChegada[i+1].horarioChegada <= voosChegada[i].horarioChegada){
+            voosChegada[i+1].horarioChegada = voosChegada[i].horarioChegada+1;
+        }
+    }
 }
 
 int main(int argc, char* argv[]){
@@ -132,11 +158,12 @@ int main(int argc, char* argv[]){
     vector<int> qtdeVoosChegada(size, 0); //Vetor com a quantidade de voos que chegarão de cada aeroporto
     
     gerarVoos(rank, size, voosPartida, qtdeVoosPartida);
+    cout << "Decolagens do aeroporto " << rank << endl;
     imprimirVoos(voosPartida);
     comunicarVoos(rank, size, voosPartida, qtdeVoosPartida, qtdeVoosChegada);
     enviarVoos(rank, size, voosPartida);
     receberVoos(rank, size, voosChegada, qtdeVoosChegada);
-    cout << endl << endl;
+    cout << endl << "Pousos no aeroporto " << rank << endl;
     imprimirVoos(voosChegada);
     
     MPI_Finalize();
