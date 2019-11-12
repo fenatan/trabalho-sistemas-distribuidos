@@ -1,3 +1,13 @@
+/* Programa que simula um sistema distribuido entre aeroportos.
+Desenvolvido por: FELIPE NATAN DOS SANTOS e JOSÉ GUILHERME BENITES MACHADO
+
+	O programa gera aleatoriamente um numero de voos para cada aeroporto com origem e destino, depois através de uma comunicação MPI
+o aeroporto origem comunica aos aeroportos destinos os voos que vai enviar. Após todos os aeroportos receberem seus voos eles imprimem na
+tela sua tabela de voos do dia.
+*/
+
+
+
 #include<bits/stdc++.h>
 #include <unistd.h> // função "usleep"
 #include <ctime> // funções "rand" e "srand"
